@@ -16,6 +16,11 @@
             height: 150px;
             margin-bottom: 10px;
         }
+        select, input {
+            padding: 10px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
         button {
             padding: 10px 20px;
             background-color: #4CAF50;
@@ -30,16 +35,43 @@
             margin-top: 20px;
             white-space: pre-wrap;
         }
+        #replaceInputs {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <h1>Email Ownership Checker</h1>
-    <p>Enter one or more emails (one per line):</p>
-    <textarea id="emailInput" placeholder="Enter emails here..."></textarea>
-    <button onclick="checkEmails()">Check Emails</button>
+    <label for="mode">Select Mode:</label>
+    <select id="mode" onchange="toggleMode()">
+        <option value="check">Check Emails</option>
+        <option value="replace">Replace Account</option>
+    </select>
+
+    <div id="checkInputs">
+        <p>Enter one or more emails (one per line):</p>
+        <textarea id="emailInput" placeholder="Enter emails here..."></textarea>
+        <button onclick="checkEmails()">Check Emails</button>
+    </div>
+
+    <div id="replaceInputs">
+        <p>Enter the original email to replace:</p>
+        <input type="text" id="originalEmail" placeholder="Original email">
+        <p>Enter the new email:</p>
+        <input type="text" id="newEmail" placeholder="New email">
+        <button onclick="replaceEmail()">Replace Email</button>
+    </div>
+
     <div id="result"></div>
 
     <script>
+        function toggleMode() {
+            const mode = document.getElementById('mode').value;
+            document.getElementById('checkInputs').style.display = mode === 'check' ? 'block' : 'none';
+            document.getElementById('replaceInputs').style.display = mode === 'replace' ? 'block' : 'none';
+            document.getElementById('result').innerHTML = '';
+        }
+
         async function checkEmails() {
             const emailInput = document.getElementById('emailInput').value.trim();
             const emails = emailInput.split('\n').map(email => email.trim()).filter(email => email);
@@ -47,7 +79,6 @@
             resultDiv.innerHTML = 'Checking...\n';
 
             try {
-                // Fetch the emails.txt file
                 const response = await fetch('emails.txt');
                 if (!response.ok) {
                     throw new Error('Unable to load emails.txt');
@@ -55,7 +86,6 @@
                 const text = await response.text();
                 const emailLines = text.split('\n').map(line => line.trim());
 
-                // Create a map of emails to their ownership
                 const emailMap = new Map();
                 emailLines.forEach(line => {
                     const [email, ...ownershipParts] = line.split(/\s+/);
@@ -65,7 +95,6 @@
                     }
                 });
 
-                // Check each input email
                 let resultText = '';
                 emails.forEach(email => {
                     const lowerEmail = email.toLowerCase();
@@ -73,9 +102,8 @@
                         resultText += `${email}: Not exist\n`;
                     } else {
                         const ownership = emailMap.get(lowerEmail);
-                        // Check if ownership starts with a digit (indicating a date)
-                        if (ownership.match(/^\d/)) {
-                            resultText += `${email}: Rana VPN ka h\n`;
+                        if (ownership && /^\d/.test(ownership)) {
+                            resultText += `${email}: Rana VPN\n`;
                         } else if (ownership === 'R') {
                             resultText += `${email}: Rana sahab ka h\n`;
                         } else if (ownership === 'R Green') {
@@ -95,6 +123,58 @@
                 });
 
                 resultDiv.innerHTML = resultText || 'No valid emails provided.';
+            } catch (error) {
+                resultDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        async function replaceEmail() {
+            const originalEmail = document.getElementById('originalEmail').value.trim();
+            const newEmail = document.getElementById('newEmail').value.trim();
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Processing...\n';
+
+            if (!originalEmail || !newEmail) {
+                resultDiv.innerHTML = 'Error: Please enter both original and new emails.';
+                return;
+            }
+
+            try {
+                const response = await fetch('emails.txt');
+                if (!response.ok) {
+                    throw new Error('Unable to load emails.txt');
+                }
+                const text = await response.text();
+                const emailLines = text.split('\n').map(line => line.trim());
+
+                let found = false;
+                const updatedLines = emailLines.map(line => {
+                    const [email, ...ownershipParts] = line.split(/\s+/);
+                    if (email && email.toLowerCase() === originalEmail.toLowerCase()) {
+                        found = true;
+                        const ownership = ownershipParts.join(' ').trim();
+                        return `${newEmail} ${ownership}`;
+                    }
+                    return line;
+                });
+
+                if (!found) {
+                    resultDiv.innerHTML = `Error: Original email "${originalEmail}" not found in emails.txt.`;
+                    return;
+                }
+
+                const updatedText = updatedLines.join('\n');
+                resultDiv.innerHTML = `Replacement successful! Below is the updated emails.txt content. Download and replace the file in your repository:\n\n${updatedText}\n\n`;
+
+                // Create a downloadable file
+                const blob = new Blob([updatedText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'emails.txt';
+                a.textContent = 'Download updated emails.txt';
+                resultDiv.appendChild(a);
+
             } catch (error) {
                 resultDiv.innerHTML = `Error: ${error.message}`;
             }
