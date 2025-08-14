@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Ownership Checker</title>
-    <script src="https://cdn.jsdelivr.net/npm/@octokit/core@5/dist-web/octokit.min.js"></script>
+    <!-- Use a reliable CDN for octokit.js -->
+    <script src="https://unpkg.com/@octokit/core@5.2.0/dist-web/octokit.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -68,6 +69,11 @@
     <div id="result"></div>
 
     <script>
+        // Check if Octokit is loaded
+        if (typeof Octokit === 'undefined') {
+            document.getElementById('result').innerHTML = 'Error: Octokit library failed to load. Please check your internet connection or try refreshing the page.';
+        }
+
         function toggleMode() {
             const mode = document.getElementById('mode').value;
             document.getElementById('checkInputs').style.display = mode === 'check' ? 'block' : 'none';
@@ -140,6 +146,11 @@
 
             if (!githubToken || !originalEmail || !newEmail) {
                 resultDiv.innerHTML = 'Error: Please enter GitHub token, original email, and new email.';
+                return;
+            }
+
+            if (typeof Octokit === 'undefined') {
+                resultDiv.innerHTML = 'Error: Octokit library not loaded. Please refresh the page or check your internet connection.';
                 return;
             }
 
