@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Ownership Checker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@octokit/core@5/dist-web/octokit.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,12 +12,12 @@
             margin: 20px auto;
             padding: 20px;
         }
-        textarea {
+        textarea, input {
             width: 100%;
-            height: 150px;
+            padding: 10px;
             margin-bottom: 10px;
         }
-        select, input {
+        select {
             padding: 10px;
             margin-bottom: 10px;
             width: 100%;
@@ -55,6 +56,8 @@
     </div>
 
     <div id="replaceInputs">
+        <p>Enter your GitHub Personal Access Token:</p>
+        <input type="password" id="githubToken" placeholder="GitHub PAT (e.g., ghp_...)">
         <p>Enter the original email to replace:</p>
         <input type="text" id="originalEmail" placeholder="Original email">
         <p>Enter the new email:</p>
@@ -129,24 +132,42 @@
         }
 
         async function replaceEmail() {
+            const githubToken = document.getElementById('githubToken').value.trim();
             const originalEmail = document.getElementById('originalEmail').value.trim();
             const newEmail = document.getElementById('newEmail').value.trim();
             const resultDiv = document.getElementById('result');
             resultDiv.innerHTML = 'Processing...\n';
 
-            if (!originalEmail || !newEmail) {
-                resultDiv.innerHTML = 'Error: Please enter both original and new emails.';
+            if (!githubToken || !originalEmail || !newEmail) {
+                resultDiv.innerHTML = 'Error: Please enter GitHub token, original email, and new email.';
                 return;
             }
 
             try {
-                const response = await fetch('emails.txt');
-                if (!response.ok) {
-                    throw new Error('Unable to load emails.txt');
-                }
-                const text = await response.text();
-                const emailLines = text.split('\n').map(line => line.trim());
+                // Initialize Octokit with the provided token
+                const octokit = new Octokit({ auth: githubToken });
 
+                // Fetch current emails.txt
+                const repoOwner = 'your-username'; // Replace with your GitHub username
+                const repoName = 'your-repo'; // Replace with your repository name
+                const path = 'emails.txt';
+
+                let sha;
+                let content;
+                try {
+                    const { data } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+                        owner: repoOwner,
+                        repo: repoName,
+                        path: path
+                    });
+                    sha = data.sha;
+                    content = atob(data.content); // Decode base64 content
+                } catch (error) {
+                    throw new Error('Unable to fetch emails.txt from GitHub: ' + error.message);
+                }
+
+                // Process the file content
+                const emailLines = content.split('\n').map(line => line.trim());
                 let found = false;
                 const updatedLines = emailLines.map(line => {
                     const [email, ...ownershipParts] = line.split(/\s+/);
@@ -163,18 +184,18 @@
                     return;
                 }
 
-                const updatedText = updatedLines.join('\n');
-                resultDiv.innerHTML = `Replacement successful! Below is the updated emails.txt content. Download and replace the file in your repository:\n\n${updatedText}\n\n`;
+                // Update emails.txt in the repository
+                const updatedContent = updatedLines.join('\n');
+                await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+                    owner: repoOwner,
+                    repo: repoName,
+                    path: path,
+                    message: `Replace ${originalEmail} with ${newEmail} in emails.txt`,
+                    content: btoa(updatedContent), // Encode to base64
+                    sha: sha
+                });
 
-                // Create a downloadable file
-                const blob = new Blob([updatedText], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'emails.txt';
-                a.textContent = 'Download updated emails.txt';
-                resultDiv.appendChild(a);
-
+                resultDiv.innerHTML = `Success: Replaced "${originalEmail}" with "${newEmail}" in emails.txt. Changes are live in the repository.`;
             } catch (error) {
                 resultDiv.innerHTML = `Error: ${error.message}`;
             }
