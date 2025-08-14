@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Ownership Checker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #result {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>Email Ownership Checker</h1>
+    <p>Enter one or more emails (one per line):</p>
+    <textarea id="emailInput" placeholder="Enter emails here..."></textarea>
+    <button onclick="checkEmails()">Check Emails</button>
+    <div id="result"></div>
+
+    <script>
+        async function checkEmails() {
+            const emailInput = document.getElementById('emailInput').value.trim();
+            const emails = emailInput.split('\n').map(email => email.trim()).filter(email => email);
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Checking...\n';
+
+            try {
+                // Fetch the emails.txt file
+                const response = await fetch('emails.txt');
+                if (!response.ok) {
+                    throw new Error('Unable to load emails.txt');
+                }
+                const text = await response.text();
+                const emailLines = text.split('\n').map(line => line.trim());
+
+                // Create a map of emails to their ownership
+                const emailMap = new Map();
+                emailLines.forEach(line => {
+                    const [email, ...ownershipParts] = line.split(/\s+/);
+                    if (email) {
+                        const ownership = ownershipParts.join(' ').trim();
+                        emailMap.set(email.toLowerCase(), ownership);
+                    }
+                });
+
+                // Check each input email
+                let resultText = '';
+                emails.forEach(email => {
+                    const lowerEmail = email.toLowerCase();
+                    if (!emailMap.has(lowerEmail)) {
+                        resultText += `${email}: Not exist\n`;
+                    } else {
+                        const ownership = emailMap.get(lowerEmail);
+                        // Check if ownership starts with a digit (indicating a date)
+                        if (ownership.match(/^\d/)) {
+                            resultText += `${email}: Rana VPN ka h\n`;
+                        } else if (ownership === 'R') {
+                            resultText += `${email}: Rana sahab ka h\n`;
+                        } else if (ownership === 'R Green') {
+                            resultText += `${email}: Green ka h\n`;
+                        } else if (ownership === 'R ASAD') {
+                            resultText += `${email}: Asad ka h\n`;
+                        } else if (ownership === 'R Ahsan') {
+                            resultText += `${email}: Ahsan ka h\n`;
+                        } else if (ownership === 'R WB') {
+                            resultText += `${email}: WB ka h\n`;
+                        } else if (ownership === '') {
+                            resultText += `${email}: Screen wala h\n`;
+                        } else {
+                            resultText += `${email}: Unknown ownership (${ownership})\n`;
+                        }
+                    }
+                });
+
+                resultDiv.innerHTML = resultText || 'No valid emails provided.';
+            } catch (error) {
+                resultDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
